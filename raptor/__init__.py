@@ -11,6 +11,15 @@ from .Retrievers import BaseRetriever
 from .SummarizationModels import (BaseSummarizationModel,
                                   GPT3SummarizationModel,
                                   GPT3TurboSummarizationModel)
+from .HypoQuestionModels import (BaseHypoQuestionModel,
+                                 GPT3HypoQuestionModel,
+                                 GPT3TurboHypoQuestionModel)
+from .InfoEvalModels import (BaseInfoEvalModel,
+                             GPT3InfoEvalModel,
+                             GPT3TurboInfoEvalModel)
+from .FamiliarEvalModels import (BaseFamiliarEvalModel,
+                                 GPT3FamiliarEvalModel,
+                                 GPT3TurboFamiliarEvalModel)
 from .tree_builder import TreeBuilder, TreeBuilderConfig
 from .tree_retriever import TreeRetriever, TreeRetrieverConfig
 from .tree_structures import Node, Tree

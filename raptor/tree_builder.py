@@ -1,10 +1,11 @@
 import copy
 import logging
 import os
-from abc import abstractclassmethod
+from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from typing import Dict, List, Optional, Set, Tuple
+import inspect
 
 import openai
 import tiktoken
@@ -13,6 +14,12 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 from .EmbeddingModels import BaseEmbeddingModel, OpenAIEmbeddingModel
 from .SummarizationModels import (BaseSummarizationModel,
                                   GPT3TurboSummarizationModel)
+from .HypoQuestionModels import (BaseHypoQuestionModel,
+                                 GPT3TurboHypoQuestionModel)
+from .InfoEvalModels import (BaseInfoEvalModel,
+                             GPT3TurboInfoEvalModel)
+from .FamiliarEvalModels import (BaseFamiliarEvalModel,
+                                 GPT3TurboFamiliarEvalModel)
 from .tree_structures import Node, Tree
 from .utils import (distances_from_embeddings, get_children, get_embeddings,
                     get_node_list, get_text,
@@ -32,6 +39,9 @@ class TreeBuilderConfig:
         selection_mode=None,
         summarization_length=None,
         summarization_model=None,
+        hypo_qs_model=None,
+        info_eval_model=None,
+        familiar_eval_model=None,
         embedding_models=None,
         cluster_embedding_model=None,
     ):
@@ -81,6 +91,30 @@ class TreeBuilderConfig:
             )
         self.summarization_model = summarization_model
 
+        if hypo_qs_model is None:
+            hypo_qs_model = GPT3TurboHypoQuestionModel()
+        if not isinstance(hypo_qs_model, BaseHypoQuestionModel):
+            raise ValueError(
+                "hypo_qs_model must be an instance of BaseHypoQuestionModel"
+            )
+        self.hypo_qs_model = hypo_qs_model
+
+        if info_eval_model is None:
+            info_eval_model = GPT3TurboInfoEvalModel()
+        if not isinstance(info_eval_model, BaseInfoEvalModel):
+            raise ValueError(
+                "info_eval_model must be an instance of BaseInfoEvalModel"
+            )
+        self.info_eval_model = info_eval_model
+
+        if familiar_eval_model is None:
+            familiar_eval_model = GPT3TurboFamiliarEvalModel()
+        if not isinstance(familiar_eval_model, BaseFamiliarEvalModel):
+            raise ValueError(
+                "familiar_eval_model must be an instance of BaseFamiliarEvalModel"
+            )
+        self.familiar_eval_model = familiar_eval_model
+
         if embedding_models is None:
             embedding_models = {"OpenAI": OpenAIEmbeddingModel()}
         if not isinstance(embedding_models, dict):
@@ -113,6 +147,9 @@ class TreeBuilderConfig:
             Selection Mode: {selection_mode}
             Summarization Length: {summarization_length}
             Summarization Model: {summarization_model}
+            Hypo_question Model: {hypo_qs_model}
+            Info_Eval Model: {info_eval_model}
+            Familiar_Eval Model: {familiar_eval_model}
             Embedding Models: {embedding_models}
             Cluster Embedding Model: {cluster_embedding_model}
         """.format(
@@ -124,6 +161,9 @@ class TreeBuilderConfig:
             selection_mode=self.selection_mode,
             summarization_length=self.summarization_length,
             summarization_model=self.summarization_model,
+            hypo_qs_model=self.hypo_qs_model,
+            info_eval_model=self.info_eval_model,
+            familiar_eval_model=self.familiar_eval_model,
             embedding_models=self.embedding_models,
             cluster_embedding_model=self.cluster_embedding_model,
         )
@@ -148,6 +188,9 @@ class TreeBuilder:
         self.selection_mode = config.selection_mode
         self.summarization_length = config.summarization_length
         self.summarization_model = config.summarization_model
+        self.hypo_qs_model = config.hypo_qs_model
+        self.info_eval_model = config.info_eval_model
+        self.familiar_eval_model = config.familiar_eval_model
         self.embedding_models = config.embedding_models
         self.cluster_embedding_model = config.cluster_embedding_model
 
@@ -176,6 +219,13 @@ class TreeBuilder:
             model_name: model.create_embedding(text)
             for model_name, model in self.embedding_models.items()
         }
+        if 'hypo_qs' in inspect.signature(Node.__init__).parameters:
+            hypo_qs = self.generate_hypo_qs(text)
+            hypo_qs_embeddings = {
+                model_name: model.create_embedding(hypo_qs)
+                for model_name, model in self.embedding_models.items()
+            }
+            return (index, Node(text, index, children_indices, embeddings, hypo_qs, hypo_qs_embeddings))
         return (index, Node(text, index, children_indices, embeddings))
 
     def create_embedding(self, text) -> List[float]:
@@ -204,6 +254,19 @@ class TreeBuilder:
             str: The generated summary.
         """
         return self.summarization_model.summarize(context, max_tokens)
+    
+    def generate_hypo_qs(self, context, max_tokens=150) -> str:
+        """
+        Generates a hypo question of the input context using the specified hypo question model.
+
+        Args:
+            context (str, optional): The context to generate question.
+            max_tokens (int, optional): The maximum number of tokens in the generated question. Defaults to 150.0
+
+        Returns:
+            str: The generated question.
+        """
+        return self.hypo_qs_model.generate_hypo_qs(context, max_tokens)
 
     def get_relevant_nodes(self, current_node, list_nodes) -> List[Node]:
         """
@@ -257,7 +320,7 @@ class TreeBuilder:
 
         return leaf_nodes
 
-    def build_from_text(self, text: str, use_multithreading: bool = True) -> Tree:
+    def build_from_text(self, text: str, use_multithreading: bool = True, out_json: str = None) -> Tree:
         """Builds a golden tree from the input text, optionally using multithreading.
 
         Args:
@@ -288,13 +351,19 @@ class TreeBuilder:
 
         all_nodes = copy.deepcopy(leaf_nodes)
 
-        root_nodes = self.construct_tree(all_nodes, all_nodes, layer_to_nodes)
+        root_nodes, leaf_nodes, node_index_to_remove = self.construct_tree(all_nodes, all_nodes, layer_to_nodes, leaf_nodes)
+        if hasattr(all_nodes[0], 'if_store'):
+            all_nodes = self.remove_redundant_nodes(all_nodes, node_index_to_remove, out_json)
+            leaf_nodes = self.remove_redundant_nodes_dict(leaf_nodes)
+            layer_to_nodes = self.remove_redundant_nodes_list(layer_to_nodes)
 
         tree = Tree(all_nodes, root_nodes, leaf_nodes, self.num_layers, layer_to_nodes)
 
         return tree
 
-    @abstractclassmethod
+    # @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def construct_tree(
         self,
         current_level_nodes: Dict[int, Node],

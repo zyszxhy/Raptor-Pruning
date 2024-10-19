@@ -164,6 +164,18 @@ def get_embeddings(node_list: List[Node], embedding_model: str) -> List:
     """
     return [node.embeddings[embedding_model] for node in node_list]
 
+def get_hypo_qs_embeddings(node_list: List[Node], embedding_model: str) -> List:
+    """
+    Extracts the hypo question embeddings of nodes from a list of nodes.
+
+    Args:
+        node_list (List[Node]): List of nodes.
+        embedding_model (str): The name of the embedding model to be used.
+
+    Returns:
+        List: List of node hypo question embeddings.
+    """
+    return [node.hypo_qs_embeddings[embedding_model] for node in node_list]
 
 def get_children(node_list: List[Node]) -> List[Set[int]]:
     """

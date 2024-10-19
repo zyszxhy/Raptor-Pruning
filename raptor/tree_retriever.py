@@ -8,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 from .EmbeddingModels import BaseEmbeddingModel, OpenAIEmbeddingModel
 from .Retrievers import BaseRetriever
 from .tree_structures import Node, Tree
-from .utils import (distances_from_embeddings, get_children, get_embeddings,
+from .utils import (distances_from_embeddings, get_children, get_embeddings, get_hypo_qs_embeddings,
                     get_node_list, get_text,
                     indices_of_nearest_neighbors_from_distances,
                     reverse_mapping)
@@ -173,7 +173,10 @@ class TreeRetriever(BaseRetriever):
 
         node_list = get_node_list(self.tree.all_nodes)
 
-        embeddings = get_embeddings(node_list, self.context_embedding_model)
+        if hasattr(node_list[0], 'hypo_qs'):
+            embeddings = get_hypo_qs_embeddings(node_list, self.context_embedding_model)
+        else:
+            embeddings = get_embeddings(node_list, self.context_embedding_model)
 
         distances = distances_from_embeddings(query_embedding, embeddings)
 
@@ -217,7 +220,10 @@ class TreeRetriever(BaseRetriever):
 
         for layer in range(num_layers):
 
-            embeddings = get_embeddings(node_list, self.context_embedding_model)
+            if hasattr(node_list[0], 'hypo_qs'):
+                embeddings = get_hypo_qs_embeddings(node_list, self.context_embedding_model)
+            else:
+                embeddings = get_embeddings(node_list, self.context_embedding_model)
 
             distances = distances_from_embeddings(query_embedding, embeddings)
 

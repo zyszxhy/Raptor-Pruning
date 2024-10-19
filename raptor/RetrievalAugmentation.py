@@ -5,6 +5,9 @@ from .cluster_tree_builder import ClusterTreeBuilder, ClusterTreeConfig
 from .EmbeddingModels import BaseEmbeddingModel
 from .QAModels import BaseQAModel, GPT3TurboQAModel
 from .SummarizationModels import BaseSummarizationModel
+from .HypoQuestionModels import BaseHypoQuestionModel
+from .InfoEvalModels import BaseInfoEvalModel
+from .FamiliarEvalModels import BaseFamiliarEvalModel
 from .tree_builder import TreeBuilder, TreeBuilderConfig
 from .tree_retriever import TreeRetriever, TreeRetrieverConfig
 from .tree_structures import Node, Tree
@@ -23,6 +26,9 @@ class RetrievalAugmentationConfig:
         qa_model=None,
         embedding_model=None,
         summarization_model=None,
+        hypo_qs_model=None,
+        info_eval_model=None,
+        familiar_eval_model=None,
         tree_builder_type="cluster",
         # New parameters for TreeRetrieverConfig and TreeBuilderConfig
         # TreeRetrieverConfig arguments
@@ -43,6 +49,9 @@ class RetrievalAugmentationConfig:
         tb_selection_mode="top_k",
         tb_summarization_length=100,
         tb_summarization_model=None,
+        tb_hypo_qs_model=None,
+        tb_info_eval_model=None,
+        tb_familiar_eval_model=None,
         tb_embedding_models=None,
         tb_cluster_embedding_model="OpenAI",
     ):
@@ -86,6 +95,48 @@ class RetrievalAugmentationConfig:
                 )
             tb_summarization_model = summarization_model
 
+        if hypo_qs_model is not None and not isinstance(
+            hypo_qs_model, BaseHypoQuestionModel
+        ):
+            raise ValueError(
+                "hypo_qs_model must be an instance of BaseHypoQuestionModel"
+            )
+
+        elif hypo_qs_model is not None:
+            if tb_hypo_qs_model is not None:
+                raise ValueError(
+                    "Only one of 'tb_hypo_qs_model' or 'hypo_qs_model' should be provided, not both."
+                )
+            tb_hypo_qs_model = hypo_qs_model
+        
+        if info_eval_model is not None and not isinstance(
+            info_eval_model, BaseInfoEvalModel
+        ):
+            raise ValueError(
+                "info_eval_model must be an instance of BaseInfoEvalModel"
+            )
+
+        elif info_eval_model is not None:
+            if tb_info_eval_model is not None:
+                raise ValueError(
+                    "Only one of 'tb_info_eval_model' or 'info_eval_model' should be provided, not both."
+                )
+            tb_info_eval_model = info_eval_model
+
+        if familiar_eval_model is not None and not isinstance(
+            familiar_eval_model, BaseFamiliarEvalModel
+        ):
+            raise ValueError(
+                "info_eval_model must be an instance of BaseFamiliarEvalModel"
+            )
+
+        elif familiar_eval_model is not None:
+            if tb_familiar_eval_model is not None:
+                raise ValueError(
+                    "Only one of 'tb_familiar_eval_model' or 'familiar_eval_model' should be provided, not both."
+                )
+            tb_familiar_eval_model = familiar_eval_model
+
         # Set TreeBuilderConfig
         tree_builder_class, tree_builder_config_class = supported_tree_builders[
             tree_builder_type
@@ -100,6 +151,9 @@ class RetrievalAugmentationConfig:
                 selection_mode=tb_selection_mode,
                 summarization_length=tb_summarization_length,
                 summarization_model=tb_summarization_model,
+                hypo_qs_model=tb_hypo_qs_model,
+                info_eval_model=tb_info_eval_model,
+                familiar_eval_model=tb_familiar_eval_model,
                 embedding_models=tb_embedding_models,
                 cluster_embedding_model=tb_cluster_embedding_model,
             )
@@ -201,7 +255,7 @@ class RetrievalAugmentation:
             f"Successfully initialized RetrievalAugmentation with Config {config.log_config()}"
         )
 
-    def add_documents(self, docs):
+    def add_documents(self, docs, out_json):
         """
         Adds documents to the tree and creates a TreeRetriever instance.
 
@@ -216,7 +270,7 @@ class RetrievalAugmentation:
                 # self.add_to_existing(docs)
                 return
 
-        self.tree = self.tree_builder.build_from_text(text=docs)
+        self.tree = self.tree_builder.build_from_text(text=docs, out_json=out_json)
         self.retriever = TreeRetriever(self.tree_retriever_config, self.tree)
 
     def retrieve(
@@ -263,6 +317,7 @@ class RetrievalAugmentation:
     def answer_question(
         self,
         question,
+        options: str = None,
         top_k: int = 10,
         start_layer: int = None,
         num_layers: int = None,
@@ -291,7 +346,10 @@ class RetrievalAugmentation:
             question, start_layer, num_layers, top_k, max_tokens, collapse_tree, True
         )
 
-        answer = self.qa_model.answer_question(context, question)
+        if options:
+            answer = self.qa_model.answer_question(context, question, options)
+        else:
+            answer = self.qa_model.answer_question(context, question)
 
         if return_layer_information:
             return answer, layer_information
