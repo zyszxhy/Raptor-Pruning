@@ -20,6 +20,8 @@ from .InfoEvalModels import (BaseInfoEvalModel,
                              GPT3TurboInfoEvalModel)
 from .FamiliarEvalModels import (BaseFamiliarEvalModel,
                                  GPT3TurboFamiliarEvalModel)
+from .ResumModels import (BaseResumModel,
+                          GPT3TurboResumModel)
 from .tree_structures import Node, Tree
 from .utils import (distances_from_embeddings, get_children, get_embeddings,
                     get_node_list, get_text,
@@ -42,6 +44,7 @@ class TreeBuilderConfig:
         hypo_qs_model=None,
         info_eval_model=None,
         familiar_eval_model=None,
+        resum_model=None,
         embedding_models=None,
         cluster_embedding_model=None,
     ):
@@ -115,6 +118,14 @@ class TreeBuilderConfig:
             )
         self.familiar_eval_model = familiar_eval_model
 
+        if resum_model is None:
+            resum_model = GPT3TurboResumModel()
+        if not isinstance(resum_model, BaseResumModel):
+            raise ValueError(
+                "resum_model must be an instance of BaseResumModel"
+            )
+        self.resum_model = resum_model
+
         if embedding_models is None:
             embedding_models = {"OpenAI": OpenAIEmbeddingModel()}
         if not isinstance(embedding_models, dict):
@@ -150,6 +161,7 @@ class TreeBuilderConfig:
             Hypo_question Model: {hypo_qs_model}
             Info_Eval Model: {info_eval_model}
             Familiar_Eval Model: {familiar_eval_model}
+            Resum Model: {resum_model}
             Embedding Models: {embedding_models}
             Cluster Embedding Model: {cluster_embedding_model}
         """.format(
@@ -164,6 +176,7 @@ class TreeBuilderConfig:
             hypo_qs_model=self.hypo_qs_model,
             info_eval_model=self.info_eval_model,
             familiar_eval_model=self.familiar_eval_model,
+            resum_model=self.resum_model,
             embedding_models=self.embedding_models,
             cluster_embedding_model=self.cluster_embedding_model,
         )
@@ -191,6 +204,7 @@ class TreeBuilder:
         self.hypo_qs_model = config.hypo_qs_model
         self.info_eval_model = config.info_eval_model
         self.familiar_eval_model = config.familiar_eval_model
+        self.resum_model = config.resum_model
         self.embedding_models = config.embedding_models
         self.cluster_embedding_model = config.cluster_embedding_model
 

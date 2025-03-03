@@ -190,8 +190,8 @@ def evaluate_rag_accuracy(dataset_json, out_json):
         data = [json.loads(line) for line in f]
     f.close()
 
-    with open(out_json, 'a', encoding='utf-8') as output_f:
-        for item in tqdm(data[137:], desc="Article"):
+    with open(out_json, 'w', encoding='utf-8') as output_f:
+        for item in tqdm(data, desc="Article"):
             article = item["article"]
             query_list = item["query_list"]
 
@@ -216,4 +216,4 @@ def evaluate_rag_accuracy(dataset_json, out_json):
 
 if __name__ == "__main__":
     evaluate_rag_accuracy(dataset_json='/home/zhangyusi/RAG_data/qasper/dummy_data/qasper-test-and-evaluator-v0.3/qasper-test-v0.3_extract.json',
-                        out_json='/home/zhangyusi/raptor/output_result/qasper-test-v0.3_llama3.1_nomic-embed-text/raptor_llm-familiar-filter-6-1.json')
+                        out_json='/home/zhangyusi/raptor/output_result/qasper-test-v0.3_llama3.1_nomic-embed-text/raptor_familiar-6-1-filter-6-3-sim-0-85.json')

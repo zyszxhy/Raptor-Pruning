@@ -136,7 +136,7 @@ def evaluate(gold, predicted):
 if __name__ == "__main__":
     gold = "/home/zhangyusi/raptor/utils/qasper-test-v0.3.json"
     text_evidence_only = True
-    predictions = "/home/zhangyusi/raptor/output_result/qasper-test-v0.3_llama3.1_nomic-embed-text/raptor_llm-familiar-filter-6-3.json"
+    predictions = "/home/zhangyusi/raptor/output_result/qasper-test-v0.3_llama3.1_nomic-embed-text/raptor_familiar-6-1-filter-6-3-sim-0-85.json"
 
     gold_data = json.load(open(gold))
     gold_answers_and_evidence = get_answers_and_evidence(gold_data, text_evidence_only)

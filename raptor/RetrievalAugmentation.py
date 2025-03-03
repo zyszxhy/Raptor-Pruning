@@ -8,6 +8,7 @@ from .SummarizationModels import BaseSummarizationModel
 from .HypoQuestionModels import BaseHypoQuestionModel
 from .InfoEvalModels import BaseInfoEvalModel
 from .FamiliarEvalModels import BaseFamiliarEvalModel
+from .ResumModels import BaseResumModel
 from .tree_builder import TreeBuilder, TreeBuilderConfig
 from .tree_retriever import TreeRetriever, TreeRetrieverConfig
 from .tree_structures import Node, Tree
@@ -29,6 +30,7 @@ class RetrievalAugmentationConfig:
         hypo_qs_model=None,
         info_eval_model=None,
         familiar_eval_model=None,
+        resum_model=None,
         tree_builder_type="cluster",
         # New parameters for TreeRetrieverConfig and TreeBuilderConfig
         # TreeRetrieverConfig arguments
@@ -52,6 +54,7 @@ class RetrievalAugmentationConfig:
         tb_hypo_qs_model=None,
         tb_info_eval_model=None,
         tb_familiar_eval_model=None,
+        tb_resum_model=None,
         tb_embedding_models=None,
         tb_cluster_embedding_model="OpenAI",
     ):
@@ -137,6 +140,20 @@ class RetrievalAugmentationConfig:
                 )
             tb_familiar_eval_model = familiar_eval_model
 
+        if resum_model is not None and not isinstance(
+            resum_model, BaseResumModel
+        ):
+            raise ValueError(
+                "resum_model must be an instance of BaseResumModel"
+            )
+
+        elif resum_model is not None:
+            if tb_resum_model is not None:
+                raise ValueError(
+                    "Only one of 'tb_resum_model' or 'resum_model' should be provided, not both."
+                )
+            tb_resum_model = resum_model
+
         # Set TreeBuilderConfig
         tree_builder_class, tree_builder_config_class = supported_tree_builders[
             tree_builder_type
@@ -154,6 +171,7 @@ class RetrievalAugmentationConfig:
                 hypo_qs_model=tb_hypo_qs_model,
                 info_eval_model=tb_info_eval_model,
                 familiar_eval_model=tb_familiar_eval_model,
+                resum_model=tb_resum_model,
                 embedding_models=tb_embedding_models,
                 cluster_embedding_model=tb_cluster_embedding_model,
             )

@@ -2,6 +2,9 @@ import logging
 import os
 from typing import Dict, List, Set
 
+import numpy as np
+import umap
+
 import tiktoken
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
@@ -155,6 +158,41 @@ class TreeRetriever(BaseRetriever):
         """
         return self.embedding_model.create_embedding(text)
 
+    def remove_linearly_dependent_nodes(self, nodes, dim: int = 10, num_neighbors: int = None, metric: str = "cosine"):
+        if len(nodes) <= 2:
+            return []
+        embeddings = np.array([node.embeddings[self.context_embedding_model] for node in nodes])
+        if num_neighbors is None:
+            num_neighbors = max(int((len(embeddings) - 1) ** 0.5), 2)
+        if len(embeddings) <= dim + 1:
+            reduced_embeddings = umap.UMAP(n_neighbors=num_neighbors, n_components=dim, metric=metric, init='random').fit_transform(embeddings).T
+        else:
+            reduced_embeddings = umap.UMAP(n_neighbors=num_neighbors, n_components=dim, metric=metric).fit_transform(embeddings).T
+        # reduced_embeddings = embeddings.T
+        m, n = reduced_embeddings.shape
+        lin_indep_values = np.zeros(n)
+        q_array = np.zeros((m, n))
+        q_array[:, 0] = reduced_embeddings[:, 0]
+        lin_indep_values[0] = 1.0
+
+        for i in range(1, n):
+            a_i = reduced_embeddings[:, i]
+            projection = np.zeros(m)
+            
+            for j in range(i):
+                q_j = q_array[:, j]
+                if np.all(q_j==0):
+                    continue
+                # q_j_normalized = q_j / np.linalg.norm(q_j)
+                # proj_component = np.dot(a_i, q_j_normalized) * q_j_normalized
+                proj_component = (np.dot(a_i, q_j) / np.dot(q_j, q_j)) * q_j
+                projection += proj_component
+            r_i = a_i - projection
+            lin_indep_values[i] = np.linalg.norm(r_i) / np.linalg.norm(a_i)
+            q_array[:, i] = r_i
+        
+        return lin_indep_values
+    
     def retrieve_information_collapse_tree(self, query: str, top_k: int, max_tokens: int) -> str:
         """
         Retrieves the most relevant information from the tree based on the query.
@@ -182,10 +220,19 @@ class TreeRetriever(BaseRetriever):
 
         indices = indices_of_nearest_neighbors_from_distances(distances)
 
-        total_tokens = 0
-        for idx in indices[:top_k]:
-
+        selected_nodes_1 = []
+        for idx in indices[:top_k * 2]:
             node = node_list[idx]
+            selected_nodes_1.append(node)
+        lin_indep_values = self.remove_linearly_dependent_nodes(selected_nodes_1)
+        lin_index = np.argsort(-lin_indep_values)
+
+        total_tokens = 0
+        # for idx in indices[:top_k]:
+        for idx in lin_index[:top_k]:
+
+            # node = node_list[idx]
+            node = selected_nodes_1[idx]
             node_tokens = len(self.tokenizer.encode(node.text))
 
             if total_tokens + node_tokens > max_tokens:

@@ -197,8 +197,8 @@ def evaluate_rag_accuracy(dataset_json, out_json):
     total_questions = 0
     correct_answers = 0
 
-    with open(out_json, 'w', encoding='utf-8') as output_f:
-        for item in tqdm(data, desc="Article"):
+    with open(out_json, 'a', encoding='utf-8') as output_f:
+        for item in tqdm(data[95:], desc="Article"):
             article = item["article"]
             query_list = item["query_list"]
 
@@ -213,11 +213,14 @@ def evaluate_rag_accuracy(dataset_json, out_json):
                     raise ValueError('what?')
 
                 
-                predicted_answer = RAG_QA_answer_raptor(model, query, options)
-                if len(predicted_answer) > 2:
-                    predicted_label = -5
-                else:
-                    predicted_label = int(predicted_answer[0])
+                predicted_answer = "None"
+                while(predicted_answer[0] < '0' or predicted_answer[0] > '9'):
+                    predicted_answer = RAG_QA_answer_raptor(model, query, options)
+                # if len(predicted_answer) > 4:
+                #     predicted_label = -5
+                # else:
+                #     predicted_label = int(predicted_answer[0])
+                predicted_label = int(predicted_answer[0])
                 if predicted_label == label + 1:
                     correct_answers += 1
                 
@@ -242,5 +245,5 @@ def evaluate_rag_accuracy(dataset_json, out_json):
 
 if __name__ == "__main__":
     accuracy = evaluate_rag_accuracy(dataset_json='/home/zhangyusi/raptor/data/QuALITY.v1.0.1.htmlstripped_article.dev.jsonl',
-                                     out_json='/home/zhangyusi/raptor/output_result/dev_llama3.1_nomic-embed-text/raptor_llm-familiar-filter.json')
+                                     out_json='/home/zhangyusi/raptor/output_result/dev_mistral_nomic-embed-text/raptor_test.json')
     print(f"accuracy: {accuracy:.2%}")

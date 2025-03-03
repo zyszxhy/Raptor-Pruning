@@ -20,6 +20,9 @@ from .InfoEvalModels import (BaseInfoEvalModel,
 from .FamiliarEvalModels import (BaseFamiliarEvalModel,
                                  GPT3FamiliarEvalModel,
                                  GPT3TurboFamiliarEvalModel)
+from .ResumModels import (BaseResumModel,
+                          GPT3ResumModel,
+                          GPT3TurboResumModel)
 from .tree_builder import TreeBuilder, TreeBuilderConfig
 from .tree_retriever import TreeRetriever, TreeRetrieverConfig
 from .tree_structures import Node, Tree

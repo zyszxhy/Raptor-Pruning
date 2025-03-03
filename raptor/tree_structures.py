@@ -6,7 +6,7 @@ class Node:
     Represents a node in the hierarchical tree structure.
     """
 
-    def __init__(self, text: str, index: int, children: Set[int], embeddings, if_store: bool=True) -> None: # hypo_qs: str, hypo_qs_embeddings, 
+    def __init__(self, text: str, index: int, children: Set[int], embeddings, if_store: bool = True, re_sum: str = None) -> None: # hypo_qs: str, hypo_qs_embeddings, 
         self.text = text
         self.index = index
         self.children = children
@@ -14,6 +14,7 @@ class Node:
         # self.hypo_qs = hypo_qs
         # self.hypo_qs_embeddings = hypo_qs_embeddings
         self.if_store = if_store
+        self.re_sum = re_sum
 
 
 class Tree:

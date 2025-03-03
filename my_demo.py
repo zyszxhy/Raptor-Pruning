@@ -1,5 +1,5 @@
 from raptor import BaseSummarizationModel, BaseQAModel, BaseEmbeddingModel, RetrievalAugmentationConfig, RetrievalAugmentation, \
-                    BaseHypoQuestionModel, BaseInfoEvalModel, BaseFamiliarEvalModel
+                    BaseHypoQuestionModel, BaseInfoEvalModel, BaseFamiliarEvalModel, BaseResumModel
 
 from langchain_community.chat_models import ChatZhipuAI
 from langchain_community.embeddings import ZhipuAIEmbeddings
@@ -15,6 +15,25 @@ import os
 # os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
 # os.environ['LANGCHAIN_API_KEY'] = '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'
 # os.environ['LANGCHAIN_PROJECT'] = 'quality_test_1'
+
+class LanagchianReSum(BaseResumModel):
+    def __init__(self, model):
+        self.eval_model = model
+        self.message = ChatPromptTemplate.from_messages([
+            ("system", "You are a helpful assistant."),
+            ("human", "Here is a summary of a long text and an excerpt from that text. \
+                        Carefully read both and identify the important additional information in the excerpt that is not mentioned in the summary. \
+                        Concisely summarize this additional information.\n \
+                        Summary:\n \
+                        {summary}\n \
+                        Excerpt:\n \
+                        {context}:"),
+        ])
+        self.eval_chain = self.message | self.eval_model | StrOutputParser()
+
+    def Re_sum(self, summary, context):   # summary, 
+        return self.eval_chain.invoke({"summary":summary, "context":context})  # "summary":summary, 
+
 
 class If_known(BaseModel):
     """Generate the bool answer"""
@@ -41,17 +60,20 @@ class LanagchianFamiliarEval(BaseFamiliarEvalModel):
             #             Text:\n \
             #             {context}"),
         ])
-        # self.eval_chain = self.message | self.eval_model | StrOutputParser()
-        self.eval_chain = self.message | self.eval_model.with_structured_output(InfoEvalScore)
+        self.eval_chain = self.message | self.eval_model | StrOutputParser()
+        self.eval_chain_structure = self.message | self.eval_model.with_structured_output(InfoEvalScore)
 
     def eval_familiar(self, summary, context):   # summary, 
         return self.eval_chain.invoke({"summary":summary, "context":context})  # "summary":summary, 
+    
+    def eval_familiar_structure(self, summary, context):   # summary, 
+        return self.eval_chain_structure.invoke({"summary":summary, "context":context})  # "summary":summary, 
 
 class InfoEvalScore(BaseModel):
     """Generate the eval score."""
     score: int = Field(..., description="the eval score.")
 
-class LangchainInfoEvalModel(BaseInfoEvalModel):
+class LangchainInfoEvalModel(BaseInfoEvalModel):    # TODO rewrite the node with less texts and core information
     def __init__(self, model):
         self.eval_model = model
         self.message = ChatPromptTemplate.from_messages([
@@ -65,9 +87,12 @@ class LangchainInfoEvalModel(BaseInfoEvalModel):
                         {context}\n \
                         Please answer using Arabic numerals only 1, 2, 3, 4, 5, 6:"),
         ])
-        # self.eval_chain = self.message | self.eval_model | StrOutputParser()
-        self.eval_chain = self.message | self.eval_model.with_structured_output(InfoEvalScore)
+        self.eval_chain = self.message | self.eval_model | StrOutputParser()
+        self.eval_chain_structure = self.message | self.eval_model.with_structured_output(InfoEvalScore)
 
+    def eval_info_structure(self, summary, context):
+        return self.eval_chain_structure.invoke({"summary":summary, "context":context})
+    
     def eval_info(self, summary, context):
         return self.eval_chain.invoke({"summary":summary, "context":context})
 
@@ -114,12 +139,12 @@ class LangchainQAModel(BaseQAModel):
         
         self.message = ChatPromptTemplate.from_messages([
             ("system", "You are Question Answering Portal."),
-            # ("human", "Given Context: {context}\n Give the id of the best answer amongst the option to the question: {question}.\n \
-            #  Options:\n \
-            #  {options}\n \
-            #  Please answer using Arabic numerals only 1, 2, 3, 4:"),
+            ("human", "Given Context: {context}\n Give the id of the best answer amongst the option to the question: {question}.\n \
+             Options:\n \
+             {options}\n \
+             Please answer using Arabic numerals only 1, 2, 3, 4:"),
 
-            ("human", "Using the folloing information \n{context}. \nAnswer the following question in less than 5-7 words, if possible: \n{question}"),
+            # ("human", "Using the folloing information \n{context}. \nAnswer the following question in less than 5-7 words, if possible: \n{question}"),
         ])
         self.parser = StrOutputParser()
         self.qa_chain = self.message | self.chat_model | self.parser
@@ -156,6 +181,9 @@ class raptor_method:
         #                               model. Common transformations include adding a system message or formatting a template with the user input.')
         # print(sum_text)
 
+        # Re_sum model
+        self.resum_model = LanagchianReSum(model=self.ollama_model_sum)
+
         # hypo_question model
         self.hypo_qs_model = LangchainHypoQuestionModel(model=self.ollama_model_sum)
 
@@ -185,6 +213,7 @@ class raptor_method:
                                                hypo_qs_model=self.hypo_qs_model, 
                                                info_eval_model=self.info_eval_mdoel,
                                                familiar_eval_model=self.familiar_eval_model,
+                                               resum_model=self.resum_model,
                                                qa_model=self.qa_model, 
                                                embedding_model=self.embedding_model)
         
